@@ -1,9 +1,12 @@
 package base;
 
+import io.qameta.allure.restassured.AllureRestAssured;
 import io.restassured.builder.RequestSpecBuilder;
 import io.restassured.specification.RequestSpecification;
 import org.testng.annotations.BeforeClass;
 import utils.ConfigReader;
+
+import static io.restassured.RestAssured.enableLoggingOfRequestAndResponseIfValidationFails;
 
 
 public class BaseTest {
@@ -12,9 +15,11 @@ public class BaseTest {
 
     @BeforeClass
     public void setup() {
+        enableLoggingOfRequestAndResponseIfValidationFails();
         this.spec = new RequestSpecBuilder()
                 .setBaseUri(ConfigReader.get("base.uri"))
                 .addHeader("Content-Type", "application/json")
+                .addFilter(new AllureRestAssured())
                 .build();
     }
 }
