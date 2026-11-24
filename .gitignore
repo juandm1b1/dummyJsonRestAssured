@@ -44,3 +44,5 @@ out/
 # --- Allure reports ---
 allure-results/
 .allure/
+
+test-output/
