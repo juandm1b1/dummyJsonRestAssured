@@ -48,9 +48,6 @@ jobs:
           gh_pages: gh-pages
           allure_report: allure-report
 
-      - name: Configure Git Default Branch
-        run: git config --global init.defaultBranch gh-pages
-
       - name: Deploy Allure Report to GitHub Pages
         uses: peaceiris/actions-gh-pages@v4
         if: always()
@@ -58,4 +55,3 @@ jobs:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: allure-history
           publish_branch: gh-pages
-          force_orphan: true
