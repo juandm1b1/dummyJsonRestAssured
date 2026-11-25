@@ -1,5 +1,6 @@
 package base;
 
+import com.atlassian.oai.validator.restassured.OpenApiValidationFilter;
 import io.qameta.allure.restassured.AllureRestAssured;
 import io.restassured.builder.RequestSpecBuilder;
 import io.restassured.specification.RequestSpecification;
@@ -15,10 +16,12 @@ public class BaseTest {
 
     @BeforeClass
     public void setup() {
+        OpenApiValidationFilter validationFilter = new OpenApiValidationFilter("src/test/resources/openapi.json");
         enableLoggingOfRequestAndResponseIfValidationFails();
         this.spec = new RequestSpecBuilder()
                 .setBaseUri(ConfigReader.get("base.uri"))
                 .addHeader("Content-Type", "application/json")
+                .addFilter(validationFilter)
                 .addFilter(new AllureRestAssured())
                 .build();
     }
