@@ -39,12 +39,14 @@ jobs:
           path: gh-pages
 
       - name: Generate Allure Report with History
-        uses: simple-elf/allure-report-action@v1.13
+        uses: simple-elf/allure-report-action@v1.15
         if: always()
         with:
           allure_results: allure-results
           allure_history: allure-history
           keep_reports: 10
+          gh_pages: gh-pages
+          allure_report: allure-report
 
       - name: Deploy Allure Report to GitHub Pages
         uses: peaceiris/actions-gh-pages@v4
