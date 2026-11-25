@@ -9,6 +9,7 @@ import org.testng.annotations.Test;
 import utils.ConfigReader;
 
 import static io.restassured.RestAssured.given;
+import static io.restassured.module.jsv.JsonSchemaValidator.matchesJsonSchemaInClasspath;
 import static org.hamcrest.Matchers.*;
 import static org.testng.Assert.assertNotEquals;
 import static org.testng.Assert.assertNotNull;
@@ -49,6 +50,7 @@ public class AuthTests extends BaseTest {
         String jwtRegex = "^[A-Za-z0-9-_]+\\.[A-Za-z0-9-_]+\\.[A-Za-z0-9-_]+$";
         loginResponse.then()
                 .statusCode(200)
+                .body(matchesJsonSchemaInClasspath("schemas/login-response-schema.json"))
                 .body("accessToken", notNullValue())
                 .body("accessToken", matchesPattern(jwtRegex))
                 .body("refreshToken", notNullValue())
@@ -67,6 +69,7 @@ public class AuthTests extends BaseTest {
                 .get("/auth/me")
                 .then()
                 .statusCode(200)
+                .body(matchesJsonSchemaInClasspath("schemas/me-response-schema.json"))
                 .body("firstName", equalTo("Sophia"))
                 .body("email", equalTo("sophia.brown@x.dummyjson.com"));
     }
@@ -95,6 +98,7 @@ public class AuthTests extends BaseTest {
                 .get("/auth/me")
                 .then()
                 .statusCode(200)
+                .body(matchesJsonSchemaInClasspath("schemas/me-response-schema.json"))
                 .body("firstName", equalTo("Sophia"))
                 .body("email", equalTo("sophia.brown@x.dummyjson.com"));
     }
@@ -115,6 +119,7 @@ public class AuthTests extends BaseTest {
                 .then()
                 .statusCode(401)
                 .contentType(ContentType.JSON)
+                .body(matchesJsonSchemaInClasspath("schemas/me-401-response-schema.json"))
                 .body("message", equalTo("Access Token is required"))
                 .body("email", nullValue())
                 .body("password", nullValue());
@@ -135,6 +140,7 @@ public class AuthTests extends BaseTest {
                 .get("/auth/me")
                 .then()
                 .statusCode(401)
+                .body(matchesJsonSchemaInClasspath("schemas/me-401-response-schema.json"))
                 .body("message", equalTo("invalid signature"));
     }
 
@@ -183,6 +189,7 @@ public class AuthTests extends BaseTest {
                 .post("/auth/refresh")
                 .then()
                 .statusCode(anyOf(is(401), is(403)))
+                .body(matchesJsonSchemaInClasspath("schemas/refresh-401-response-schema.json"))
                 .body("message", equalTo("Invalid refresh token"))
                 .body("accessToken", nullValue());
     }
@@ -202,6 +209,7 @@ public class AuthTests extends BaseTest {
                 .post("/auth/refresh")
                 .then()
                 .statusCode(200)
+                .body(matchesJsonSchemaInClasspath("schemas/refresh-response-schema.json"))
                 .extract().path("accessToken");
     }
 }
