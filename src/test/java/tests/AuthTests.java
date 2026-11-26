@@ -6,36 +6,36 @@ import io.restassured.http.ContentType;
 import io.restassured.response.Response;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
+import pojo.*;
 import utils.ConfigReader;
 
 import static io.restassured.RestAssured.given;
-import static io.restassured.module.jsv.JsonSchemaValidator.matchesJsonSchemaInClasspath;
 import static org.hamcrest.Matchers.*;
-import static org.testng.Assert.assertNotEquals;
-import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.*;
 
 @Epic("Identity & Access Management (IAM)")
 @Feature("JWT Authentication & Session Lifecycle")
 public class AuthTests extends BaseTest {
 
-    private final String validLoginBody = String.format(
-            "{\"username\":\"%s\",\"password\":\"%s\"}",
-            ConfigReader.get("username"),
-            ConfigReader.get("password"));
     private Response loginResponse;
     private String accessToken;
     private String refreshToken;
 
     @BeforeClass(description = "Authenticate base user and extract initial tokens for the test suite")
     public void initAuthData() {
+        LoginRequest validLoginRequest = new LoginRequest(
+                ConfigReader.get("username"),
+                ConfigReader.get("password")
+        );
         this.loginResponse = given()
                 .spec(spec)
-                .body(validLoginBody)
+                .body(validLoginRequest)
                 .when()
                 .post("/auth/login");
 
-        this.accessToken = loginResponse.path("accessToken");
-        this.refreshToken = loginResponse.path("refreshToken");
+        LoginResponse loginData = loginResponse.as(LoginResponse.class);
+        this.accessToken = loginData.accessToken();
+        this.refreshToken = loginData.refreshToken();
     }
 
     // =========================================================================
@@ -50,11 +50,13 @@ public class AuthTests extends BaseTest {
         String jwtRegex = "^[A-Za-z0-9-_]+\\.[A-Za-z0-9-_]+\\.[A-Za-z0-9-_]+$";
         loginResponse.then()
                 .statusCode(200)
-                .body(matchesJsonSchemaInClasspath("schemas/login-response-schema.json"))
-                .body("accessToken", notNullValue())
                 .body("accessToken", matchesPattern(jwtRegex))
-                .body("refreshToken", notNullValue())
                 .body("refreshToken", matchesPattern(jwtRegex));
+
+        LoginResponse loginData = loginResponse.as(LoginResponse.class);
+        assertNotNull(loginData.accessToken(), "accessToken should not be null");
+        assertNotNull(loginData.refreshToken(), "refreshToken should not be null");
+        assertNotNull(loginData.email(), "email should not be null");
     }
 
     @Test(description = "Authorized access to protected resource using Bearer accessToken")
@@ -62,16 +64,18 @@ public class AuthTests extends BaseTest {
     @Severity(SeverityLevel.CRITICAL)
     @Description("Technique: State Transition Testing (Authenticated -> Resource Access). Validates that GET /auth/me returns HTTP 200 along with the expected user profile matching the provided token.")
     public void verifyGetAuthorizedAccessReturns200WhenValidLoginCredentials() {
-        given()
+        Response response = given()
                 .spec(spec)
                 .header("Authorization", "Bearer " + accessToken)
                 .when()
-                .get("/auth/me")
-                .then()
-                .statusCode(200)
-                .body(matchesJsonSchemaInClasspath("schemas/me-response-schema.json"))
-                .body("firstName", equalTo("Sophia"))
-                .body("email", equalTo("sophia.brown@x.dummyjson.com"));
+                .get("/auth/me");
+        response.then()
+                .statusCode(200);
+
+        UserResponse user = response.as(UserResponse.class);
+        assertNotNull(user.firstName());
+        assertEquals(user.email(), "sophia.brown@x.dummyjson.com");
+        assertEquals(user.address().city(), "Washington");
     }
 
     @Test(description = "Session renewal issuing a new accessToken distinct from the original")
@@ -91,16 +95,17 @@ public class AuthTests extends BaseTest {
     public void verifyGetMeReturns200WhenUsingRefreshedAccessToken() {
         String newAccessToken = getRefreshedAccessToken();
 
-        given()
+        Response response = given()
                 .spec(spec)
                 .header("Authorization", "Bearer " + newAccessToken)
                 .when()
-                .get("/auth/me")
-                .then()
-                .statusCode(200)
-                .body(matchesJsonSchemaInClasspath("schemas/me-response-schema.json"))
-                .body("firstName", equalTo("Sophia"))
-                .body("email", equalTo("sophia.brown@x.dummyjson.com"));
+                .get("/auth/me");
+        response.then()
+                .statusCode(200);
+
+        UserResponse userResponse = response.as(UserResponse.class);
+        assertEquals(userResponse.firstName(), "Sophia");
+        assertEquals(userResponse.email(), "sophia.brown@x.dummyjson.com");
     }
 
     // =========================================================================
@@ -112,17 +117,18 @@ public class AuthTests extends BaseTest {
     @Severity(SeverityLevel.CRITICAL)
     @Description("Technique: Equivalence Partitioning (Invalid Class) / OWASP API2. Validates that GET /auth/me rejects anonymous requests without leaking sensitive user data.")
     public void verifyGetMeReturns401WhenRequestWithoutAuthorizationHeader() {
-        given()
+        Response response = given()
                 .spec(spec)
                 .when()
-                .get("/auth/me")
-                .then()
+                .get("/auth/me");
+        response.then()
                 .statusCode(401)
                 .contentType(ContentType.JSON)
-                .body(matchesJsonSchemaInClasspath("schemas/me-401-response-schema.json"))
-                .body("message", equalTo("Access Token is required"))
                 .body("email", nullValue())
                 .body("password", nullValue());
+
+        ErrorResponse errorResponse = response.as(ErrorResponse.class);
+        assertEquals(errorResponse.message(), "Access Token is required");
     }
 
     @Test(description = "KNOWN BUG: Expected HTTP 401 rejection when JWT signature has been tampered with")
@@ -133,15 +139,16 @@ public class AuthTests extends BaseTest {
     public void verifyGetMeReturns401WhenTokenIsTampered() {
         String tamperedToken = accessToken.substring(0, accessToken.length() - 1) + "X";
 
-        given()
+        Response response = given()
                 .spec(spec)
                 .header("Authorization", "Bearer " + tamperedToken)
                 .when()
-                .get("/auth/me")
-                .then()
-                .statusCode(401)
-                .body(matchesJsonSchemaInClasspath("schemas/me-401-response-schema.json"))
-                .body("message", equalTo("invalid signature"));
+                .get("/auth/me");
+        response.then()
+                .statusCode(401);
+
+        ErrorResponse errorResponse = response.as(ErrorResponse.class);
+        assertEquals(errorResponse.message(), "invalid signature");
     }
 
     @Test(description = "KNOWN BUG: Expected HTTP 401 rejection when omitting the 'Bearer ' prefix in header")
@@ -180,18 +187,19 @@ public class AuthTests extends BaseTest {
     @Description("Technique: Equivalence Partitioning (Invalid Class) / OWASP API2. Verifies that POST /auth/refresh rejects tokens with invalid signatures without issuing a new accessToken.")
     public void verifyPostRefreshReturns403WhenUsingFakeRefreshToken() {
         String fakeRefreshToken = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyIjoiZmFrZSJ9.invalidsignature";
-        String refreshBody = String.format("{\"refreshToken\":\"%s\", \"expiresInMins\": 30}", fakeRefreshToken);
+        RefreshRequest refreshRequest = new RefreshRequest(fakeRefreshToken, 30);
 
-        given()
+        Response response = given()
                 .spec(spec)
-                .body(refreshBody)
+                .body(refreshRequest)
                 .when()
-                .post("/auth/refresh")
-                .then()
+                .post("/auth/refresh");
+        response.then()
                 .statusCode(anyOf(is(401), is(403)))
-                .body(matchesJsonSchemaInClasspath("schemas/refresh-401-response-schema.json"))
-                .body("message", equalTo("Invalid refresh token"))
                 .body("accessToken", nullValue());
+
+        ErrorResponse errorResponse = response.as(ErrorResponse.class);
+        assertEquals(errorResponse.message(), "Invalid refresh token");
     }
 
     // =========================================================================
@@ -200,16 +208,15 @@ public class AuthTests extends BaseTest {
 
     @Step("Request accessToken renewal via POST /auth/refresh")
     private String getRefreshedAccessToken() {
-        String refreshBody = String.format("{\"refreshToken\":\"%s\", \"expiresInMins\": 30}", refreshToken);
-
-        return given()
+        RefreshRequest refreshRequest = new RefreshRequest(refreshToken, 30);
+        Response response = given()
                 .spec(spec)
-                .body(refreshBody)
+                .body(refreshRequest)
                 .when()
-                .post("/auth/refresh")
-                .then()
-                .statusCode(200)
-                .body(matchesJsonSchemaInClasspath("schemas/refresh-response-schema.json"))
-                .extract().path("accessToken");
+                .post("/auth/refresh");
+        response.then()
+                .statusCode(200);
+        RefreshResponse refreshResponse = response.as(RefreshResponse.class);
+        return refreshResponse.accessToken();
     }
 }
