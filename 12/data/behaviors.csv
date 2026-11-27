@@ -1,7 +1,0 @@
-"BROKEN","EPIC","FAILED","FEATURE","PASSED","SKIPPED","STORY","UNKNOWN"
-"0","Identity & Access Management (IAM)","1","JWT Authentication & Session Lifecycle","1","0","Credential Presence and Format Validation","0"
-"0","Identity & Access Management (IAM)","0","JWT Authentication & Session Lifecycle","3","0","Session Lifecycle and Token Refresh","0"
-"0","Identity & Access Management (IAM)","1","JWT Authentication & Session Lifecycle","0","0","Token Purpose Isolation","0"
-"0","Identity & Access Management (IAM)","0","JWT Authentication & Session Lifecycle","1","0","Protected Resource Authorization","0"
-"0","Identity & Access Management (IAM)","0","JWT Authentication & Session Lifecycle","1","0","Token Generation and Format Validation","0"
-"1","Identity & Access Management (IAM)","0","JWT Authentication & Session Lifecycle","0","0","JWT Signature Integrity","0"
